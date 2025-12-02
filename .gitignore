@@ -1,0 +1,39 @@
+# ========================
+# Python Bytecode
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ========================
+# Virtual environment
+# ========================
+venv/
+env/
+ENV/
+.env
+
+# ========================
+# Jupyter / Notebooks
+# ========================
+.ipynb_checkpoints/
+
+# ========================
+# ML / Data files
+# ========================
+*.h5
+*.ckpt
+*.pt
+*.pth
+*.pkl
+*.joblib
+
+# Large datasets
+data/
+*.csv
+*.npz
+*.npy
+
+# Logs / temp
+*.log
+*.tmp

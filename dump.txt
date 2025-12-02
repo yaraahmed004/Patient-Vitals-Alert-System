@@ -1,0 +1,107 @@
+from sklearn.tree import DecisionTreeClassifier
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import IsolationForest
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import GridSearchCV
+from app.utils import x_train, x_test, y_test, y_train
+import joblib
+
+pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('dt', DecisionTreeClassifier(random_state=42))
+])
+
+dt_param_grid = {
+    'dt__max_depth': [None, 5, 10, 20],
+    'dt__min_samples_split': [2, 5, 10],
+    'dt__min_samples_leaf': [1, 2, 4],
+    'dt__criterion': ['gini', 'entropy']
+}
+
+dt_grid = GridSearchCV(
+    pipeline,
+    dt_param_grid,
+    cv=3,
+    scoring='accuracy',
+    n_jobs=-1,
+    verbose=1
+)
+
+dt_grid.fit(x_train, y_train)
+joblib.dump(dt_grid.best_estimator_, 'models/decision_tree_model.pkl')
+
+y_pred_dt = dt_grid.predict(x_test)
+
+print("Decision Tree best params:", dt_grid.best_params_)
+print("Decision Tree accuracy:", accuracy_score(y_test, y_pred_dt))
+print("Decision Tree classification report:\n", classification_report(y_test, y_pred_dt))
+print("Decision Tree confusion matrix:\n", confusion_matrix(y_test, y_pred_dt))
+
+
+
+
+
+
+
+
+
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from sklearn.ensemble import IsolationForest
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import GridSearchCV
+from app.utils import x_train, x_test, y_test, y_train
+from sklearn.ensemble import IsolationForest
+import joblib
+
+iso_model = IsolationForest(
+    n_estimators=100,
+    max_samples='auto', 
+    contamination=0.05,
+    random_state=42
+)
+
+iso_model.fit(x_train)
+joblib.dump(iso_model, 'models/isolation_forest_model.pkl')
+
+y_anomaly= iso_model.predict(x_test)
+
+x_test['anomaly'] = y_anomaly
+
+print("Normal readings:", (y_anomaly == 1).sum())
+print("Anomalies detected:", (y_anomaly == -1).sum())
+
+plt.figure(figsize=(10,6))
+sns.scatterplot(
+    x=x_test['heartbeat'], 
+    y=x_test['spo2'], 
+    hue=x_test['anomaly'],
+    palette={1:'green', -1:'red'}
+)
+plt.title('Isolation Forest - Anomaly Detection')
+plt.show()
+
