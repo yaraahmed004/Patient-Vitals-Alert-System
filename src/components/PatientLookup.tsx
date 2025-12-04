@@ -1,106 +1,110 @@
-import { useState } from 'react';
-import { Search, AlertCircle } from 'lucide-react';
-import { PatientInfo } from './PatientInfo';
-
-// Mock patient database
-const patients = {
-  'P001': {
-    id: 'P001',
-    name: 'Sarah Johnson',
-    age: 45,
-    room: '302-A',
-    vitals: {
-      heartRate: 78,
-      bloodPressure: '120/80',
-      temperature: 98.6,
-      oxygenSaturation: 98,
-      respiratoryRate: 16
-    },
-    status: 'stable',
-    lastUpdated: '2 minutes ago'
-  },
-  'P002': {
-    id: 'P002',
-    name: 'Michael Chen',
-    age: 62,
-    room: '305-B',
-    vitals: {
-      heartRate: 105,
-      bloodPressure: '145/92',
-      temperature: 99.8,
-      oxygenSaturation: 94,
-      respiratoryRate: 22
-    },
-    status: 'warning',
-    lastUpdated: '1 minute ago'
-  },
-  'P003': {
-    id: 'P003',
-    name: 'Emily Rodriguez',
-    age: 34,
-    room: '208-C',
-    vitals: {
-      heartRate: 72,
-      bloodPressure: '118/76',
-      temperature: 98.4,
-      oxygenSaturation: 99,
-      respiratoryRate: 14
-    },
-    status: 'stable',
-    lastUpdated: '5 minutes ago'
-  }
-};
+import { useState, useEffect } from "react";
+import { Search, AlertCircle, Clock } from "lucide-react";
+import { PatientInfo } from "./PatientInfo";
 
 export function PatientLookup() {
-  const [patientId, setPatientId] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<typeof patients[keyof typeof patients] | null>(null);
-  const [error, setError] = useState('');
+  const [patientId, setPatientId] = useState("");
+  const [patientData, setPatientData] = useState<any | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSearch = () => {
-    setError('');
-    const patient = patients[patientId.toUpperCase() as keyof typeof patients];
-    
-    if (patient) {
-      setSelectedPatient(patient);
-    } else {
-      setSelectedPatient(null);
-      setError('Patient not found. Try P001, P002, or P003');
+  // NEW: Search History State
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+
+  // (Optional) Load history from localStorage on first mount
+  useEffect(() => {
+    const saved = localStorage.getItem("patientHistory");
+    if (saved) setSearchHistory(JSON.parse(saved));
+  }, []);
+
+  // (Optional) Save to localStorage
+  useEffect(() => {
+    localStorage.setItem("patientHistory", JSON.stringify(searchHistory));
+  }, [searchHistory]);
+
+  const handleSearch = async () => {
+    if (!patientId) return;
+
+    setError("");
+    setLoading(true);
+    setPatientData(null);
+
+    try {
+      const res = await fetch(`http://localhost:8000/prediction/${patientId}`, {
+        method: "GET",
+      });
+
+      if (!res.ok) throw new Error("Patient not found");
+
+      const data = await res.json();
+
+      const patient = {
+        id: data.patient_id.toString(),
+        name: `Patient ${data.patient_id}`,
+        age: 0,
+        room: "N/A",
+        status:
+          data.predicted_status === "Normal"
+            ? "stable"
+            : data.predicted_status === "Mild Abnormality"
+            ? "warning"
+            : "critical",
+        lastUpdated: "Just now",
+        vitals: {
+          heartRate: 0,
+          bloodPressure: "N/A",
+          temperature: 0,
+          oxygenSaturation: 0,
+          respiratoryRate: 0,
+        },
+        alert: data.alert,
+        alert_reasons: data.alert_reasons,
+        anomaly: data.anomaly,
+      };
+
+      setPatientData(patient);
+
+      // NEW: Update search history
+      setSearchHistory((prev) => {
+        const updated = prev.filter((id) => id !== patientId);
+        return [patientId, ...updated].slice(0, 10); // keep max 10
+      });
+    } catch (err) {
+      setError("Patient not found.");
+      setPatientData(null);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
+    if (e.key === "Enter") handleSearch();
   };
 
   return (
     <div className="bg-stone-50 rounded-2xl p-6 border border-stone-200">
       <div className="mb-6">
         <h2 className="text-stone-800 mb-4">Manual Patient Lookup</h2>
-        
-        {/* Search Input */}
+
         <div className="flex gap-3 mb-4">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              value={patientId}
-              onChange={(e) => setPatientId(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Enter Patient ID (e.g., P001)"
-              className="w-full px-4 py-3 bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-800 focus:border-transparent text-stone-800 placeholder:text-stone-400"
-            />
-          </div>
+          <input
+            type="text"
+            value={patientId}
+            onChange={(e) => setPatientId(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Enter Patient ID (e.g., 101)"
+            className="w-full px-4 py-3 bg-white border rounded-xl"
+          />
+
           <button
             onClick={handleSearch}
-            className="px-6 py-3 bg-amber-800 text-stone-50 rounded-xl hover:bg-amber-900 transition-colors flex items-center gap-2"
+            className="px-6 py-3 bg-amber-800 text-stone-50 rounded-xl flex items-center gap-2"
           >
             <Search className="w-4 h-4" />
             Search
           </button>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="flex items-center gap-2 text-red-700 bg-red-50 px-4 py-3 rounded-xl border border-red-200">
             <AlertCircle className="w-4 h-4" />
@@ -109,16 +113,41 @@ export function PatientLookup() {
         )}
       </div>
 
-      {/* Patient Information */}
-      {selectedPatient && <PatientInfo patient={selectedPatient} />}
+      {/* Show patient info */}
+      {patientData && <PatientInfo patient={patientData} />}
 
-      {/* Helper Text */}
-      {!selectedPatient && !error && (
+      {!patientData && !error && (
         <div className="text-center py-12">
-          <p className="text-stone-500">Enter a patient ID to view their vital signs</p>
-          <p className="text-stone-400 text-sm mt-2">Available IDs: P001, P002, P003</p>
+          <p className="text-stone-500">
+            Enter a patient ID to view prediction
+          </p>
         </div>
       )}
+
+      {/* ---------------- HISTORY SECTION ---------------- */}
+      <div className="mt-8 p-4 bg-white rounded-xl border border-stone-200">
+        <h3 className="text-stone-800 font-semibold mb-3 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-stone-500" />
+          Recent Lookups
+        </h3>
+
+        {searchHistory.length === 0 ? (
+          <p className="text-sm text-stone-400">No recent lookups.</p>
+        ) : (
+          <ul className="space-y-2">
+            {searchHistory.map((id, idx) => (
+              <li
+                key={idx}
+                onClick={() => setPatientId(id)}
+                className="p-3 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-lg cursor-pointer flex justify-between"
+              >
+                <span className="font-medium text-stone-700">Patient {id}</span>
+                <span className="text-xs text-stone-400">Tap to load</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
