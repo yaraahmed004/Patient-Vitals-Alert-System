@@ -37,3 +37,4 @@ data/
 # Logs / temp
 *.log
 *.tmp
+node_modules
